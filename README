@@ -1,0 +1,14 @@
+To build isip you will need a C compiler and ragel.  To view the
+state charts ragel produces (optional) you will need graphviz and a
+PDF viewer.
+    * ragel: http://www.complang.org/ragel/
+    * graphviz (optional): http://www.graphviz.org/
+
+make
+make check
+make install
+
+You may want to set PREFIX to something like /usr, the default is
+/usr/local.  Packagers may want to set DESTDIR.
+
+PREFIX=/usr DESTDIR=../pkg make install
