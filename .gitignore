@@ -1,4 +1,5 @@
 isip
+canonip
 *.o
 isip.c
 *.pdf

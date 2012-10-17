@@ -1,4 +1,6 @@
 RLSRC = isip.rl
+CSRC = canonip.c
+
 RAGEL ?= ragel
 DOT ?= dot
 INSTALL ?= install
@@ -13,8 +15,8 @@ ifeq ($(CC),musl-gcc)
 	LDFLAGS += -static
 endif
 
-TARGET = $(RLSRC:%.rl=%)
-OBJ    = $(RLSRC:%.rl=%.o)
+TARGET = $(RLSRC:%.rl=%) $(CSRC:%.c=%)
+OBJ    = $(RLSRC:%.rl=%.o) $(CSRC:%.c=%.o)
 RLCSRC = $(RLSRC:%.rl=%.c)
 RLPDF  = $(RLSRC:%.rl=%.pdf)
 RLDOT  = $(RLSRC:%.rl=%.dot)
@@ -22,16 +24,16 @@ RLDOT  = $(RLSRC:%.rl=%.dot)
 .PHONY: all
 all: $(TARGET)
 
-isip: isip.o
-	$(CC) $(CFLAGS) -o $@ $(LDFLAGS) $<
 %.c: %.rl
 	$(RAGEL) $(RAGEL_FLAGS) -o $@ $<
 %.dot: %.rl
 	$(RAGEL) $(RAGEL_FLAGS) -V -o $@ $<
-%.pdf: %.dot
-	$(DOT) $(DOTFLAGS) -Tpdf -o $@ $<
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
+%.pdf: %.dot
+	$(DOT) $(DOTFLAGS) -Tpdf -o $@ $<
+%: %.o
+	$(CC) $(CFLAGS) -o $@ $(LDFLAGS) $<
 
 .PHONY: check
 check: check.sh isip

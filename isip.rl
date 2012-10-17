@@ -1,14 +1,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#ifndef NI_MAXHOST
-#define NI_MAXHOST      1025
-#endif
 
 static const char PROGNAME[] = "isip";
 
@@ -98,38 +92,6 @@ static bool isip(const char *p, const size_t len, unsigned int flags)
     return true;
 }
 
-/**
- *  Get a canonical IP address
- */
-static int canonical_ip(const char *s, char *const host, size_t *const host_len)
-{
-    struct addrinfo *res;
-    int err = 0;
-
-    static const struct addrinfo HINTS = {
-        AI_V4MAPPED | AI_ADDRCONFIG | AI_NUMERICHOST,
-        AF_UNSPEC,
-        0,
-        0,
-        0,
-        NULL,
-        NULL,
-        NULL
-    };
-
-    if ((err = getaddrinfo(s, NULL, &HINTS, &res)) != 0) { goto err0; }
-    if ((err = getnameinfo(res->ai_addr, res->ai_addrlen, host, *host_len,
-            NULL, 0, NI_NUMERICHOST)) != 0) { goto err1; }
-    *host_len = strlen(host);
-    freeaddrinfo(res); res = NULL;
-    return 0;
-
-err1:
-    freeaddrinfo(res); res = NULL;
-err0:
-    return err;
-}
-
 static const char *progname;
 
 static void usage(const char *const msg)
@@ -140,10 +102,9 @@ static void usage(const char *const msg)
         fprintf(f, "%s: %s\n", progname, msg);
     }
     fprintf(f,
-        "usage: %s [-c] [-p] [-n] [-b] [-4] [-6] [-v] ADDR [,ADDR...]\n"
+        "usage: %s [-p] [-n] [-b] [-4] [-6] [-v] ADDR [,ADDR...]\n"
         "       %s -h\n"
         "\n"
-        "       -c Print the canonical IP address\n"
         "       -p Allow IP addresses with a prefix\n"
         "       -n Allow IP addresses with a netmask (same as -p)\n"
         "       -b Allow square brackets (for IPv6)\n"
@@ -158,22 +119,14 @@ static void usage(const char *const msg)
 int main(const int argc, char *const argv[])
 {
     int c;
-    char *host = NULL;
-    size_t host_len = NI_MAXHOST;
-    int canonicalize = 0;
     int verbose = 0;
     int ret = 0;
-    int rc;
     int isip_flags = 0;
 
     progname = argc > 0 ? argv[0] : PROGNAME;
 
-    while ((c = getopt(argc, argv, "hcvpnb46")) != -1) {
+    while ((c = getopt(argc, argv, "hvpnb46")) != -1) {
         switch (c) {
-            case 'c':
-                ++canonicalize;
-                break;
-
             case 'v':
                 ++verbose;
                 break;
@@ -217,11 +170,6 @@ int main(const int argc, char *const argv[])
         isip_flags |= ISIP_ALLOW_IPV4 | ISIP_ALLOW_IPV6;
     }
 
-    if (canonicalize && (host = malloc(NI_MAXHOST)) == NULL) {
-        perror(progname);
-        exit(4);
-    }
-
     for (argv += optind; optind < argc; ++optind, ++argv) {
         if (!isip(*argv, strlen(*argv), isip_flags)) {
             if (verbose) {
@@ -232,24 +180,9 @@ int main(const int argc, char *const argv[])
             goto out;
         }
         /* else */
-
-        if (canonicalize) {
-            host_len = NI_MAXHOST;
-            if ((rc = canonical_ip(*argv, host, &host_len)) == 0) {
-                fwrite(host, 1, host_len, stdout);
-                printf("\n");
-            } else {
-                if (verbose) {
-                    fprintf(stderr, "%s: %s\n", progname, gai_strerror(rc));
-                }
-                ret = 4;
-                goto out;
-            }
-        }
     }
 
 out:
-    if (canonicalize) { free(host); }
     return ret;
 }
 
