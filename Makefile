@@ -1,3 +1,4 @@
+RLSRC = isip.rl
 RAGEL ?= ragel
 DOT ?= dot
 INSTALL ?= install
@@ -12,8 +13,11 @@ ifeq ($(CC),musl-gcc)
 	LDFLAGS += -static
 endif
 
-TARGET = isip
-OBJ = isip.o
+TARGET = $(RLSRC:%.rl=%)
+OBJ    = $(RLSRC:%.rl=%.o)
+RLCSRC = $(RLSRC:%.rl=%.c)
+RLPDF  = $(RLSRC:%.rl=%.pdf)
+RLDOT  = $(RLSRC:%.rl=%.dot)
 
 .PHONY: all
 all: $(TARGET)
@@ -40,4 +44,4 @@ install: $(TARGET)
 
 .PHONY: clean
 clean:
-	-rm -f $(TARGET) $(OBJ)
+	-rm -f $(TARGET) $(OBJ) $(RLCSRC) $(RLPDF) $(RLDOT)

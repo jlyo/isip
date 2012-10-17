@@ -1,2 +1,5 @@
 isip
 *.o
+isip.c
+*.pdf
+*.dot
