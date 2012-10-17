@@ -29,6 +29,10 @@ isip: isip.o
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+.PHONY: check
+check: check.sh isip
+	./check.sh
+
 .PHONY: install
 install: $(TARGET)
 	$(INSTALL) -dm755 $(DESTDIR)$(BINDIR)
