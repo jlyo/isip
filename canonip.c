@@ -56,6 +56,7 @@ static void usage(const char *const msg)
     fprintf(f,
         "usage: %s [-v] ADDR [,ADDR...]\n"
         "       %s -h\n"
+        "\n"
         "       -v Verbose output\n"
         "\n"
         "       -h Print this help message.\n"
