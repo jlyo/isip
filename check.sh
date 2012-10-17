@@ -104,7 +104,7 @@ g
 EOF
 
 while read l; do
-    if ./isip -v $l; then
+    if ./isip $l; then
         echo "$l" >&2
         exit 1
     fi
