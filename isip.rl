@@ -68,19 +68,28 @@ static const char PROGNAME[] = "isip";
 
 #define ISIP_ALLOW_NETMASK  (1<<0)
 #define ISIP_ALLOW_BRACKETS (1<<1)
+#define ISIP_ALLOW_IPV4     (1<<2)
+#define ISIP_ALLOW_IPV6     (1<<3)
 static bool isip(const char *p, const size_t len, unsigned int flags)
 {
     const char *const pe = p + len;
     const char *const eof = pe;
     const bool allow_netmask = flags & ISIP_ALLOW_NETMASK;
     const bool allow_brackets = flags & ISIP_ALLOW_BRACKETS;
+    const bool allow_ipv4 = flags & ISIP_ALLOW_IPV4;
+    const bool allow_ipv6 = flags & ISIP_ALLOW_IPV6;
     int cs;
 
     %%{
-        ipv6_w_prefix = ipv6 (prefix  > { if (!allow_netmask) { return false; } })?;
-        main := (  ipv4 (netmask > { if (!allow_netmask) { return false; } })?
-                 | ipv6_w_prefix
-                 | ('[' ipv6_w_prefix ']') > { if (!allow_brackets) { return false; } }
+        ipv6_ = ipv6 % { if (!allow_ipv6) { return false; } };
+        ipv4_ = ipv4 % { if (!allow_ipv4) { return false; } };
+        prefix_ = prefix  % { if (!allow_netmask) { return false; } };
+        netmask_ = netmask % { if (!allow_netmask) { return false; } };
+        bracket_ipv6_ = ('[' ipv6_ prefix_? ']') %
+                            { if (!allow_brackets) { return false; } };
+        main := (  (ipv4_ netmask_?)
+                 | (ipv6_ prefix_?)
+                 | bracket_ipv6_
                 ) $err { return false; } ;
         write init;
         write exec;
@@ -131,13 +140,16 @@ static void usage(const char *const msg)
         fprintf(f, "%s: %s\n", progname, msg);
     }
     fprintf(f,
-        "usage: %s [-c] [-p] [-n] [-b] ADDR [,ADDR...]\n"
+        "usage: %s [-c] [-p] [-n] [-b] [-4] [-6] [-v] ADDR [,ADDR...]\n"
         "       %s -h\n"
         "\n"
-        "       -c Print the canonical IP address.\n"
-        "       -p Allow IP addresses with a prefix.\n"
-        "       -n Allow IP addresses with a netmask (same as -p).\n"
-        "       -b Allow square brackets (for IPv6).\n"
+        "       -c Print the canonical IP address\n"
+        "       -p Allow IP addresses with a prefix\n"
+        "       -n Allow IP addresses with a netmask (same as -p)\n"
+        "       -b Allow square brackets (for IPv6)\n"
+        "       -4 Allow IPv4 addresses\n"
+        "       -6 Allow IPv6 addresses\n"
+        "       -v Verbose output\n"
         "\n"
         "       -h Print this help message.\n"
         , progname, progname);
@@ -149,16 +161,21 @@ int main(const int argc, char *const argv[])
     char *host = NULL;
     size_t host_len = NI_MAXHOST;
     int canonicalize = 0;
+    int verbose = 0;
     int ret = 0;
     int rc;
     int isip_flags = 0;
 
     progname = argc > 0 ? argv[0] : PROGNAME;
 
-    while ((c = getopt(argc, argv, "hcpnb")) != -1) {
+    while ((c = getopt(argc, argv, "hcvpnb46")) != -1) {
         switch (c) {
             case 'c':
                 ++canonicalize;
+                break;
+
+            case 'v':
+                ++verbose;
                 break;
 
             case 'h':
@@ -175,25 +192,42 @@ int main(const int argc, char *const argv[])
                 isip_flags |= ISIP_ALLOW_BRACKETS;
                 break;
 
+            case '4':
+                isip_flags |= ISIP_ALLOW_IPV4;
+                break;
+
+            case '6':
+                isip_flags |= ISIP_ALLOW_IPV6;
+                break;
+
             default:
                 usage("Invalid option");
-                exit(1);
+                exit(2);
                 break;
         }
     }
 
     if (optind >= argc) {
         usage("Need at least one address");
-        exit(1);
+        exit(2);
+    }
+
+    /* If neither -4 or -6 specified assume both */
+    if (!(isip_flags & (ISIP_ALLOW_IPV4 | ISIP_ALLOW_IPV6))) {
+        isip_flags |= ISIP_ALLOW_IPV4 | ISIP_ALLOW_IPV6;
     }
 
     if (canonicalize && (host = malloc(NI_MAXHOST)) == NULL) {
         perror(progname);
-        exit(1);
+        exit(4);
     }
 
     for (argv += optind; optind < argc; ++optind, ++argv) {
         if (!isip(*argv, strlen(*argv), isip_flags)) {
+            if (verbose) {
+                fprintf(stderr, "%s: Not an IP address: %s\n",
+                        progname, *argv);
+            }
             ret = 1;
             goto out;
         }
@@ -205,8 +239,10 @@ int main(const int argc, char *const argv[])
                 fwrite(host, 1, host_len, stdout);
                 printf("\n");
             } else {
-                fprintf(stderr, "%s: %s\n", progname, gai_strerror(rc));
-                ret = 1;
+                if (verbose) {
+                    fprintf(stderr, "%s: %s\n", progname, gai_strerror(rc));
+                }
+                ret = 4;
                 goto out;
             }
         }
